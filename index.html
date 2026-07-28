@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://dannyelarquitecto.com/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jarvis Core</title>
+    <!-- Modern Font: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <!-- Config: URL del backend. En localhost apunta al servidor local;
+         en producción se cambia ESTA línea por la URL del backend
+         desplegado. Único lugar a tocar al desplegar. -->
+    <script>
+      try { localStorage.setItem("jarvis_pro_token", "dummy_pro_token"); } catch(e) {}
+
+      window.JARVIS_API_BASE =
+        (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+          ? 'http://localhost:3002'
+          : 'https://jarvis-core-xkfn.onrender.com';
+    </script>
+    <script type="module" crossorigin src="../assets/index-XrbzFpSo.js?v=3"></script>
+    <link rel="stylesheet" crossorigin href="../assets/index-gegO2GVH.css?v=3">
+  </head>
+  <body>
+    <!-- ===========================================================
+         MARK VII.1 · Cámara como fondo vivo
+         -----------------------------------------------------------
+         Capa más profunda del HUD. Vive por debajo de TODO (núcleo,
+         partículas, texto central, input, EVIDENCIAS, panel Estado,
+         Mission Control). Se enciende solo si el usuario hace click
+         en el chip CÁMARA y el navegador concede permiso. NUNCA se
+         capturan frames, NUNCA se sube nada, NUNCA se persiste el
+         stream. Sin visión real, sin detección, sin hand-tracking.
+         =========================================================== -->
+    <div id="camera-bg-wrap" aria-hidden="true">
+      <video id="camera-bg" autoplay playsinline muted></video>
+    </div>
+
+    <!-- Navegación a Mission Control -->
+    <a href="../mission-control/index.html" id="nav-mission-control">MISSION CONTROL &#9658;</a>
+
+    <!-- Badge superior · identidad: producto JARVIS + versión MARK +
+         edición. La etiqueta GRATIS/PRO la elige el CSS según
+         body.edition-free / body.edition-pro. MARK sube con cada
+         actualización (MARK 5 → MARK 6…) — la comunidad ve el avance. -->
+    <div class="mark-ii-badge" aria-label="JARVIS · MARK 5">
+      <span class="badge-dot"></span>
+      <span>JARVIS · MARK 5</span>
+      <span class="badge-mode badge-mode-free">GRATIS</span>
+      <span class="badge-mode badge-mode-pro">PRO</span>
+    </div>
+
+    <!-- =========================================================== -->
+    <!-- MARK IV.10 · Modo unificado                                  -->
+    <!-- La antigua "Presencia Central" (vista de inicio) era solo una -->
+    <!-- fachada; se fundió con el Tablero de Evidencias. JARVIS opera  -->
+    <!-- siempre en esta única superficie: núcleo + chat + evidencias.  -->
+    <!-- =========================================================== -->
+
+    <!-- Contenedor del Core 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- Capas MARK II — conectores SVG + nodos flotantes alrededor del núcleo -->
+    <svg id="evidence-svg-layer" aria-hidden="true"></svg>
+    <div id="evidence-nodes-layer" aria-label="Evidencias activas alrededor del núcleo"></div>
+
+    <!-- Panel lateral · Tablero de Evidencias -->
+    <aside id="evidence-board" class="evidence-board-panel empty" aria-label="Tablero de Evidencias">
+      <div class="evidence-board-title">Tablero de Evidencias</div>
+      <div class="evidence-board-empty">
+        <!-- PRO: onboarding real — el usuario SÍ puede investigar -->
+        <div class="ebe-pro">
+          <span class="ebe-headline">Tablero en espera. Pídele a JARVIS que investigue o cree evidencia.</span>
+          <span class="ebe-hint">Prueba: <em>JARVIS, investiga precio Tesla</em></span>
+        </div>
+        <!-- FREE: solo identifica el panel y remite a la sección Buscar
+             (Pro). Sin ejemplos de comando — el chip Buscar ya enseña eso. -->
+        <div class="ebe-free">
+          <span class="ebe-locked-line">📋 Aquí aparecen tus investigaciones — parte de la sección Buscar 🔒</span>
+        </div>
+      </div>
+      <div id="evidence-board-list" class="evidence-board-list"></div>
+    </aside>
+
+    <!-- Phase log de MARK II — secuencia visual durante la creación de evidencia -->
+    <div id="markii-phase-log" class="markii-phase-log" aria-live="polite"></div>
+    
+    <!-- UI -->
+    <div id="ui-layer">
+      <div id="state-text">JARVIS: CALMADO</div>
+      
+      <!-- Conversational UI -->
+      <div id="chat-container">
+        <!-- Dialog Area -->
+        <div id="dialog-area">
+          <div id="user-message" class="dialog-msg user hidden"></div>
+          <div id="jarvis-response" class="dialog-msg jarvis hidden"></div>
+        </div>
+
+        <!-- Barra de habilidades — 5 secciones que muestran QUÉ sabe
+             hacer JARVIS, para que quien llega no vea un chat vacío.
+             Se rellena desde main.js (SKILL_SECTIONS). Cada chip abre
+             un panel holográfico con ejemplos pulsables que JARVIS
+             además presenta en voz. -->
+        <div id="skill-bar" aria-label="Habilidades de JARVIS"></div>
+
+        <!-- MARK 5 — Entrada voz-primero: el micrófono es el protagonista;
+             el teclado queda como alternativa discreta. -->
+        <div id="input-area">
+          <button id="mic-btn" class="mic-hero" type="button" title="Hablar con JARVIS" aria-label="Hablar con JARVIS">🎤</button>
+          <div class="mic-hint" id="mic-hint">Pulse para conversar</div>
+          <div class="text-fallback">
+            <input type="text" id="chat-input" placeholder="o escriba aquí, señor…" autocomplete="off" />
+            <button id="send-btn" type="button">ENVIAR</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dev Controls (Hidden mostly) -->
+      <div id="controls">
+        <button class="state-btn" data-state="calmado">Calmado</button>
+        <button class="state-btn" data-state="processing">Procesando</button>
+        <button class="state-btn" data-state="speaking">Hablando</button>
+        <button class="state-btn" data-state="listening">Escuchando</button>
+      </div>
+    </div>
+    <!-- MARK VII.1 — Chip HUD para encender/apagar cámara como fondo.
+         Discreto, fijo abajo-izquierda, visible en Presencia y Tablero.
+         No es un módulo de Mission Control; es parte del HUD de Presencia. -->
+    <button id="camera-toggle" type="button" class="camera-toggle is-off"
+            aria-label="Cámara apagada · click para activar" title="Cámara">
+      <span class="cam-dot" aria-hidden="true"></span>
+      <span class="cam-text">CÁMARA &middot; <span id="camera-state-label">APAGADA</span></span>
+    </button>
+
+  </body>
+</html>
